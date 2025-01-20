@@ -3,23 +3,22 @@ package com.alura.challenge.literalura.service;
 import com.alura.challenge.literalura.dto.LibroDTO;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.util.ArrayList;
 import java.util.List;
 
+@Service
 public class GutendexService {
     private static final String BASE_URL = "https://gutendex.com/books/";
     private final HttpClient client;
-    private final ObjectMapper objectMapper;
 
     public GutendexService() {
         this.client = HttpClient.newHttpClient();
-        this.objectMapper = new ObjectMapper();
     }
 
     public List<LibroDTO> buscarLibros(String titulo) {
@@ -31,6 +30,7 @@ public class GutendexService {
 
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            System.out.println("🔍 JSON recibido: " + response.body()); // Log para depuración
             return convertirJsonALista(response.body());
         } catch (IOException | InterruptedException e) {
             throw new RuntimeException("Error al conectar con Gutendex API", e);
@@ -38,22 +38,16 @@ public class GutendexService {
     }
 
     private List<LibroDTO> convertirJsonALista(String json) {
+        ObjectMapper objectMapper = new ObjectMapper();
         try {
-            JsonNode rootNode = objectMapper.readTree(json);
-            JsonNode resultsNode = rootNode.get("results");
-
-            if (resultsNode == null || !resultsNode.isArray()) {
-                return new ArrayList<>();
-            }
-
-            List<LibroDTO> libros = new ArrayList<>();
-            for (JsonNode libroNode : resultsNode) {
-                LibroDTO libro = objectMapper.treeToValue(libroNode, LibroDTO.class);
-                libros.add(libro);
-            }
-            return libros;
+            // Leer el JSON completo
+            JsonNode root = objectMapper.readTree(json);
+            // Extraer el nodo "results"
+            JsonNode results = root.get("results");
+            // Convertir "results" en una lista de objetos LibroDTO
+            return objectMapper.readerForListOf(LibroDTO.class).readValue(results);
         } catch (IOException e) {
-            throw new RuntimeException("Error al convertir JSON a objetos Java", e);
+            throw new RuntimeException("Error al procesar el JSON", e);
         }
     }
 }

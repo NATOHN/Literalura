@@ -3,11 +3,9 @@ package com.alura.challenge.literalura.service;
 import com.alura.challenge.literalura.dto.LibroDTO;
 import com.alura.challenge.literalura.model.Libro;
 import com.alura.challenge.literalura.repositorio.LibroRepositorio;
-import com.alura.challenge.literalura.repositorio.LibroRepositorio;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -21,13 +19,7 @@ public class LibroService {
     }
 
     public void buscarYGuardarLibros(String titulo) {
-        Optional<Libro> libroExistente = libroRepository.findByTitulo(titulo);
-
-        if (libroExistente.isPresent()) {
-            System.out.println("\n✅ El libro ya existe en la base de datos: " + titulo);
-            return;
-        }
-
+        // Buscar libros en la API de Gutendex
         List<LibroDTO> librosEncontrados = gutendexService.buscarLibros(titulo);
 
         if (librosEncontrados.isEmpty()) {
@@ -35,12 +27,31 @@ public class LibroService {
             return;
         }
 
-        List<Libro> libros = librosEncontrados.stream()
-                .map(dto -> new Libro(null, dto.getTitulo(), dto.getAnioPublicacion(),
-                        dto.getIdiomas(), dto.getAutores(), dto.getLinkDescarga()))
+        // Filtrar libros que ya están en la base de datos
+        List<Libro> librosNuevos = librosEncontrados.stream()
+                .filter(dto -> !libroRepository.existsByTitulo(dto.getTitulo())) // Evitar duplicados
+                .map(dto -> new Libro(
+                        null,
+                        dto.getTitulo(),
+                        dto.getCantidadDescargas(),
+                        dto.getIdiomas(),
+                        dto.getAutores().stream()
+                                .map(autor -> autor.getNombre())
+                                .collect(Collectors.toList()),
+                        dto.getLinkDescarga()
+                ))
                 .collect(Collectors.toList());
 
-        libroRepository.saveAll(libros);
-        System.out.println("📚 Libros guardados en la base de datos.");
+        if (librosNuevos.isEmpty()) {
+            System.out.println("✅ Todos los libros ya están guardados en la base de datos.");
+        } else {
+            // Guardar los nuevos libros en la base de datos
+            libroRepository.saveAll(librosNuevos);
+            System.out.println("📚 Se han añadido nuevos libros a la base de datos.");
+        }
+    }
+
+    public List<Libro> listarLibros() {
+        return libroRepository.findAll();
     }
 }
